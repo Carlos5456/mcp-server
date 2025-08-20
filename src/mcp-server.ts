@@ -46,8 +46,7 @@ export class MCPServer {
         isError: true
       };
     }
-
-    if (params.name === 'http_request') {
+    if (params.name === 'tenant_echo') {
       const httpTool = new HttpTool(this.currentTenant);
       return await httpTool.call(params);
     }

@@ -27,7 +27,6 @@ export class HttpServer {
   }
 
   private setupRoutes(): void {
-    // Rota para listar todos os tenants disponíveis
     this.app.get('/tenants', (req: Request, res: Response) => {
       const tenants = this.tenantManager.getAllTenants();
       res.json({
@@ -36,7 +35,6 @@ export class HttpServer {
       });
     });
 
-    // Rota para acessar um tenant específico via path
     this.app.get('/:tenantId', (req: Request, res: Response) => {
       const { tenantId } = req.params;
       const tenant = this.tenantManager.getTenant(tenantId);
@@ -48,7 +46,6 @@ export class HttpServer {
         });
       }
 
-      // Configurar o tenant atual no MCP Server
       this.mcpServer.setTenant(tenant);
 
       res.json({
@@ -61,7 +58,6 @@ export class HttpServer {
       });
     });
 
-    // Endpoint MCP para um tenant específico
     this.app.get('/:tenantId/mcp', (req: Request, res: Response) => {
       const { tenantId } = req.params;
       const tenant = this.tenantManager.getTenant(tenantId);
@@ -72,10 +68,8 @@ export class HttpServer {
         });
       }
 
-      // Configurar o tenant atual
       this.mcpServer.setTenant(tenant);
 
-      // Configurar headers para SSE
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -84,27 +78,21 @@ export class HttpServer {
         'Access-Control-Allow-Headers': 'Cache-Control'
       });
 
-      // Enviar evento de conexão
       res.write('event: connected\ndata: {"message": "MCP Server conectado"}\n\n');
 
-      // Criar transport SSE
       const transport = new SSETransport();
       transport.setConnected(true);
 
-      // Conectar ao MCP Server
       this.mcpServer.handleConnection(transport);
 
-      // Enviar lista de ferramentas disponíveis
-      res.write('event: tools\ndata: {"tools": ["http_request"]}\n\n');
+      res.write('event: tools\ndata: {"tools": ["tenant_echo"]}\n\n');
 
-      // Manter conexão aberta
       req.on('close', () => {
         transport.setConnected(false);
         this.mcpServer.handleDisconnection();
         console.log(`Conexão MCP fechada para tenant: ${tenantId}`);
       });
 
-      // Enviar heartbeat a cada 30 segundos
       const heartbeat = setInterval(() => {
         if (req.destroyed) {
           clearInterval(heartbeat);
@@ -113,16 +101,14 @@ export class HttpServer {
         res.write('event: heartbeat\ndata: {"timestamp": "' + new Date().toISOString() + '"}\n\n');
       }, 30000);
 
-      // Limpar heartbeat quando a conexão for fechada
       req.on('close', () => {
         clearInterval(heartbeat);
       });
     });
 
-    // Endpoint para executar ferramentas MCP
     this.app.post('/:tenantId/execute', async (req: Request, res: Response) => {
       const { tenantId } = req.params;
-      const { tool, arguments: args } = req.body;
+      const { tool } = req.body;
 
       const tenant = this.tenantManager.getTenant(tenantId);
       if (!tenant) {
@@ -131,25 +117,22 @@ export class HttpServer {
         });
       }
 
-      // Configurar o tenant atual
       this.mcpServer.setTenant(tenant);
 
       try {
-        // Simular chamada da ferramenta
-        if (tool === 'http_request') {
+        if (tool === 'tenant_echo') {
           const result = {
             tenant: tenant.id,
             tool: tool,
-            arguments: args,
-            timestamp: new Date().toISOString(),
-            message: 'Ferramenta executada com sucesso'
+            result: `Requisição vinda do ${tenant.name || tenant.id}`,
+            timestamp: new Date().toISOString()
           };
 
           res.json(result);
         } else {
           res.status(400).json({
             error: 'Ferramenta não suportada',
-            supportedTools: ['http_request']
+            supportedTools: ['tenant_echo']
           });
         }
       } catch (error) {
@@ -160,7 +143,6 @@ export class HttpServer {
       }
     });
 
-    // Rota de health check
     this.app.get('/health', (req: Request, res: Response) => {
       res.json({
         status: 'ok',

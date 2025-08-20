@@ -24,8 +24,7 @@ export class HttpServer {
 
   private setupMiddleware(): void {
     this.app.use(cors());
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
+    // Removido body parser global para não interferir no POST do SDK (/:tenantId/mcp)
   }
 
   private setupRoutes(): void {
@@ -87,7 +86,7 @@ export class HttpServer {
       });
     });
 
-    // Endpoint MCP: POST recebe mensagens do cliente e repassa ao transport
+    // Endpoint MCP: POST recebe mensagens do cliente e repassa ao transport (sem body parser)
     this.app.post('/:tenantId/mcp', async (req: Request, res: Response) => {
       const { tenantId } = req.params;
       const tenant = this.tenantManager.getTenant(tenantId);
@@ -103,8 +102,8 @@ export class HttpServer {
       await transport.handlePostMessage(req as any, res as any);
     });
 
-    // Endpoint simples para executar a ferramenta diretamente (útil para testes)
-    this.app.post('/:tenantId/execute', async (req: Request, res: Response) => {
+    // Endpoint simples para executar a ferramenta diretamente (útil para testes) — usa body parser apenas aqui
+    this.app.post('/:tenantId/execute', express.json(), async (req: Request, res: Response) => {
       const { tenantId } = req.params;
       const { tool } = req.body;
 
